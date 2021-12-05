@@ -16,10 +16,19 @@ android {
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
+    signingConfigs {
+        release {
+            storeFile file('/Users/semin/Desktop/StudioProjects/locationMemory2/app/Untitled') // 기준은 App 폴더 기준이다.
+            storePassword "wbtlznf1@@"
+            keyAlias "key0"
+            keyPassword "wbtlznf1@@"
+        }
+    }
 
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

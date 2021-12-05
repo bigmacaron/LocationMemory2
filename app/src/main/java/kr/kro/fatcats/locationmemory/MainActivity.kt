@@ -4,9 +4,6 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.ImageDecoder
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -22,26 +19,23 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
-import com.google.android.gms.maps.model.MarkerOptions
 import com.gun0912.tedpermission.PermissionListener
 import com.gun0912.tedpermission.normal.TedPermission
 import kotlinx.coroutines.*
 import kr.kro.fatcats.locationmemory.databinding.ActivityMainBinding
-import kr.kro.fatcats.locationmemory.model.ImageInfo
 import kr.kro.fatcats.locationmemory.util.Preferences
 import kotlin.coroutines.CoroutineContext
-import java.io.IOException
 
 import android.os.Build
-import androidx.annotation.RequiresApi
-import androidx.core.content.res.ResourcesCompat
-import androidx.core.graphics.drawable.toBitmap
 import com.google.maps.android.clustering.ClusterItem
 import com.google.maps.android.clustering.ClusterManager
-
+import com.google.maps.android.clustering.view.ClusterRenderer
+import com.google.maps.android.clustering.view.DefaultClusterRenderer
+import kr.kro.fatcats.locationmemory.model.ClusterItems
+import kr.kro.fatcats.locationmemory.util.MarkerRender
+import com.gun0912.tedpermission.provider.TedPermissionProvider.context
 
 class MainActivity : AppCompatActivity(), CoroutineScope, OnMapReadyCallback ,LocationListener{
 
@@ -50,10 +44,9 @@ class MainActivity : AppCompatActivity(), CoroutineScope, OnMapReadyCallback ,Lo
         get() = Dispatchers.Main + job
     private lateinit var binding : ActivityMainBinding
     private lateinit var map : GoogleMap
-    private var currentMarker: Marker? = null
     private lateinit var locationManager: LocationManager
-    private val mediaList = mutableListOf<ImageInfo>()
-    private lateinit var clusterManager: ClusterManager<ClusterItem>
+    private val mediaList = mutableListOf<ClusterItems>()
+    private lateinit var clusterManager: ClusterManager<ClusterItems>
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,17 +56,19 @@ class MainActivity : AppCompatActivity(), CoroutineScope, OnMapReadyCallback ,Lo
         initView()
     }
 
+
     private fun initView(){
-        val permission = if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ) {
+        val permission =
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ) {
             arrayOf(
-                Manifest.permission.ACCESS_MEDIA_LOCATION,
-                Manifest.permission.READ_EXTERNAL_STORAGE
+                Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.ACCESS_MEDIA_LOCATION
             )
         }else{
             arrayOf(
                 Manifest.permission.READ_EXTERNAL_STORAGE
             )
         }
+
         getPermission(permission)
         setUpGoogleMap()
         setClick()
@@ -98,14 +93,22 @@ class MainActivity : AppCompatActivity(), CoroutineScope, OnMapReadyCallback ,Lo
                     PackageManager.PERMISSION_GRANTED &&
                     ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_MEDIA_LOCATION) !=
                     PackageManager.PERMISSION_GRANTED) {
-                    Toast.makeText(this@MainActivity, "권한을 허용해주세요", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "추가 권한이 필요합니다", Toast.LENGTH_SHORT).show()
                 }else{
+                    Log.d("durldi","durl")
+                    Log.d("버전 체크","${Build.VERSION.SDK_INT} : ${Build.VERSION_CODES.Q}")
+                    if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ) {
+                            getPermission(arrayOf(
+                                Manifest.permission.ACCESS_MEDIA_LOCATION
+                            ))
+                    }
                     getPhoto()
                     setMarker()
                 }
             }
         }
     }
+
 
 
     private fun getLocation(){
@@ -153,6 +156,7 @@ class MainActivity : AppCompatActivity(), CoroutineScope, OnMapReadyCallback ,Lo
         getSaveLocation()
     }
 
+
     companion object{
         const val CAMERA_ZOOM_LEVEL : Float = 17f
     }
@@ -182,7 +186,16 @@ class MainActivity : AppCompatActivity(), CoroutineScope, OnMapReadyCallback ,Lo
                 index = cursor.getColumnIndex(proj[1])
                 val title = cursor.getString(index)
                 val contentUri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
-                val image = ImageInfo(id,title,contentUri,getLnt(contentUri))
+                val position = getLnt(contentUri)
+                var lat = 0.0
+                position?.let {
+                    lat = it.latitude
+                }
+                var lng = 0.0
+                position?.let {
+                    lng = it.longitude
+                }
+                val image = ClusterItems(id,lat,lng,title,contentUri)
                 mediaList.add(image)
                 count ++
             }
@@ -206,64 +219,21 @@ class MainActivity : AppCompatActivity(), CoroutineScope, OnMapReadyCallback ,Lo
             inputStream.close()
         }
         return latLng
-//        var lat : Double = 0.0
-//        var lng : Double = 0.0
-//        var latLng : LatLng? = null
-//        val inputStream = contentResolver.openInputStream(uri)
-//        inputStream?.let {
-//            var exif  = ExifInterface(inputStream)
-//            val latString = exif.getAttribute(ExifInterface.TAG_GPS_LATITUDE)
-//            val lngString = exif.getAttribute(ExifInterface.TAG_GPS_LONGITUDE)
-//            val gps1 = latString?.split(",")
-//            val gps2 = lngString?.split(",")
-//
-//            gps1?.let {
-//                val one = it[0].split("/")
-//                val two = it[1].split("/")
-//                val three = it[1].split("/")
-//                lat = (one[0].toDouble()/one[1].toDouble()+(two[0].toDouble()/two[1].toDouble())/60+(three[0].toDouble()/three[1].toDouble())/3600)
-//                Log.d("tts1","${lat} ")
-//            }
-//            gps2?.let {
-//                val one = it[0].split("/")
-//                val two = it[1].split("/")
-//                val three = it[1].split("/")
-//                lng = (one[0].toDouble()/one[1].toDouble()+(two[0].toDouble()/two[1].toDouble())/60+(three[0].toDouble()/three[1].toDouble())/3600)
-//                Log.d("tts2","${lng} ")
-//            }
-//            latLng = LatLng(lat,lng)
-//            inputStream.close()
-//        }
-//        return latLng
     }
 
-    private suspend fun setMarker()=withContext(Dispatchers.IO) {
+    private suspend fun setMarker()=withContext(Dispatchers.Main) {
         binding.setVariable(BR.visibilityBool,false)
         Log.d("진입확인","setMaker in")
-        if (mediaList.size != 0) {
-            mediaList.map { it ->
-                it.modelLatLng?.let { latLng ->
-                    val markerOptions = MarkerOptions().apply {
-                        position(latLng)
-                        Log.d("positions","${latLng.latitude},${latLng.longitude}")
-                        var iconImage : Bitmap? = null
-                        try {
-                            val bitmapOptions = BitmapFactory.Options()
-                            // 불러올때 1/32 의 크기로 읽음
-                            bitmapOptions.inSampleSize = 32
-                            iconImage = BitmapFactory.decodeStream(contentResolver.openInputStream(it.uri),null,bitmapOptions)
-
-                        } catch (e: IOException) {
-                            e.printStackTrace()
-                        }
-                        iconImage?.let { bitmap->
-                            val smallMarker = Bitmap.createScaledBitmap(bitmap, 200, 150, false)
-                            icon(BitmapDescriptorFactory.fromBitmap(smallMarker))
-                        }
-                    }
-                    withContext(Dispatchers.Main){
-                        map.addMarker(markerOptions)
-                    }
+        if(::clusterManager.isInitialized.not()){
+            clusterManager = ClusterManager(this@MainActivity,map)
+            map.setOnCameraIdleListener(clusterManager)
+            Log.d("mediaList.size","size : ${mediaList.size}")
+            if(mediaList.size != 0){
+                mediaList.map{
+                    val clusterRenderer = MarkerRender(this@MainActivity, map, clusterManager)
+                    clusterManager.renderer = clusterRenderer
+                    clusterManager.addItem(it)
+                    Log.d("진입해서","${it.position.latitude}:${it.position.longitude}")
                 }
             }
         }
@@ -281,16 +251,15 @@ class MainActivity : AppCompatActivity(), CoroutineScope, OnMapReadyCallback ,Lo
         }
     }
     private val permissionListener: PermissionListener = object : PermissionListener {
-        override fun onPermissionGranted() {
-//            Toast.makeText(this@MainActivity, "Permission Granted", Toast.LENGTH_SHORT).show()
-        }
-
         override fun onPermissionDenied(deniedPermissions: List<String?>) {
             Toast.makeText(
                 this@MainActivity,
                 "Permission Denied\n$deniedPermissions",
                 Toast.LENGTH_SHORT
             ).show()
+        }
+        override fun onPermissionGranted() {
+//            Toast.makeText(this@MainActivity, "Permission Granted", Toast.LENGTH_SHORT).show()
         }
     }
 
