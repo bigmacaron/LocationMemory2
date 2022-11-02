@@ -63,13 +63,6 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
-        <View
-            android:id="@+id/loadingView"
-            android:elevation="1dp"
-            android:background="#CC000000"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="@{visibilityBool == false ? View.GONE : View.VISIBLE}"/>
 
 
 
